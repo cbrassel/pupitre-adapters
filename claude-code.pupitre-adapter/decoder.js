@@ -548,9 +548,70 @@ function discover(paths) {
   }
 }
 
-// Jalon 4 : traduction des hooks. Pas encore implémenté.
+// ---------------------------------------------------------------------------
+// Hooks (jalon 4) : JSON reçu sur stdin par le hook → événements hook.* du contrat.
+// Champs vérifiés sur la doc officielle des hooks et sur Claude Code 2.1.325 (voir docs/adapter-api.md).
+
+var MAX_HOOK_MESSAGE = 1000;
+
+// Types de Notification qui demandent une action de l'utilisateur dans le terminal.
+var ATTENTION_NOTIFICATIONS = {
+  permission_prompt: true, elicitation_dialog: true, elicitation_url_dialog: true, agent_needs_input: true
+};
+
+function _hookText(v) {
+  var s = _str(v);
+  if (s === null) return null;
+  s = s.trim();
+  return s.length ? _truncate(s, MAX_HOOK_MESSAGE) : null;
+}
+
 function mapHookEvent(json) {
-  return [];
+  try {
+    var d = json;
+    if (typeof d === "string") d = JSON.parse(d);
+    if (!_isObj(d)) return [];
+    var name = _str(d.hook_event_name);
+    switch (name) {
+      case "SessionStart": {
+        var sid = _str(d.session_id);
+        if (!sid) return [];
+        var ev = { kind: "hook.session", sessionId: sid };
+        if (_str(d.transcript_path)) ev.transcriptPath = d.transcript_path;
+        if (_str(d.source)) ev.source = d.source;
+        return [ev];
+      }
+      case "UserPromptSubmit":
+        return [{ kind: "hook.busy" }];
+      case "Stop": {
+        var idle = { kind: "hook.idle" };
+        var msg = _hookText(d.last_assistant_message);
+        if (msg) idle.message = msg;
+        return [idle];
+      }
+      case "SubagentStop": {
+        var stop = { kind: "hook.agentStop" };
+        if (_str(d.agent_id)) stop.agentId = d.agent_id;
+        if (_str(d.agent_transcript_path)) stop.transcriptPath = d.agent_transcript_path;
+        return [stop];
+      }
+      case "Notification": {
+        var type = _str(d.notification_type);
+        var text = _hookText(d.message);
+        // Sans type (anciennes versions) : tout sauf le rappel d'inactivité.
+        var attention = type ? ATTENTION_NOTIFICATIONS[type] === true
+                             : !(text && /waiting for your input/i.test(text));
+        if (!attention) return [];
+        var att = { kind: "hook.attention" };
+        if (text) att.message = text;
+        return [att];
+      }
+      default:
+        return [];
+    }
+  } catch (e) {
+    return [];
+  }
 }
 
 // Export Node, gardé pour que JavaScriptCore évalue le fichier sans erreur.

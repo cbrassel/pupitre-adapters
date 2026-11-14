@@ -388,7 +388,42 @@ unit("entrées invalides", () => {
   check("decodeFile non-chaîne → []", deepEqual(call("decodeFile", undefined, MAIN), []));
   check("decodeFile lignes mêlées", deepEqual(kinds(withoutMeta(call("decodeFile", "garbage\n" + userLine("a") + "\n\n{]\n", MAIN))), ["user.prompt"]));
   check("decodeAgentMeta invalide → null", call("decodeAgentMeta", "{") === null && call("decodeAgentMeta", "[]") === null);
-  check("mapHookEvent → []", deepEqual(call("mapHookEvent", { hook_event_name: "Stop" }), []));
+  check("mapHookEvent invalide → []", deepEqual(call("mapHookEvent", null), []) && deepEqual(call("mapHookEvent", "{"), []) &&
+    deepEqual(call("mapHookEvent", [1]), []) && deepEqual(call("mapHookEvent", { hook_event_name: 3 }), []));
+});
+
+unit("mapHookEvent", () => {
+  // Formes de la doc officielle des hooks (chemins fictifs).
+  const common = { session_id: "11111111-2222-4333-8444-555555555555", cwd: "/Users/user/Projet/project",
+    transcript_path: "/Users/user/.claude/projects/-Users-user-Projet-project/11111111-2222-4333-8444-555555555555.jsonl",
+    permission_mode: "default" };
+  const hook = (name, extra = {}) => call("mapHookEvent", { ...common, hook_event_name: name, ...extra });
+
+  check("SessionStart → hook.session", deepEqual(hook("SessionStart", { source: "clear", model: "m" }), [{ kind: "hook.session",
+    sessionId: common.session_id, transcriptPath: common.transcript_path, source: "clear" }]), JSON.stringify(hook("SessionStart")));
+  check("SessionStart sans session_id → []", deepEqual(call("mapHookEvent", { hook_event_name: "SessionStart", source: "startup" }), []));
+  check("SessionStart reçu en texte JSON", deepEqual(call("mapHookEvent", JSON.stringify({ ...common, hook_event_name: "SessionStart" })),
+    [{ kind: "hook.session", sessionId: common.session_id, transcriptPath: common.transcript_path }]));
+  check("UserPromptSubmit → hook.busy (le prompt n'est pas recopié)",
+    deepEqual(hook("UserPromptSubmit", { prompt: "secret" }), [{ kind: "hook.busy" }]));
+  check("Stop → hook.idle + message", deepEqual(hook("Stop", { stop_hook_active: false, last_assistant_message: "  OK  " }),
+    [{ kind: "hook.idle", message: "OK" }]));
+  check("Stop sans message", deepEqual(hook("Stop"), [{ kind: "hook.idle" }]));
+  const long = hook("Stop", { last_assistant_message: "y".repeat(5000) });
+  check("Stop : message tronqué à 1000", long[0].message.length === 1000, String(long[0].message.length));
+  check("SubagentStop → hook.agentStop", deepEqual(hook("SubagentStop", { agent_id: "def456", agent_type: "Explore",
+    agent_transcript_path: "/x/subagents/agent-def456.jsonl", last_assistant_message: "fini" }),
+    [{ kind: "hook.agentStop", agentId: "def456", transcriptPath: "/x/subagents/agent-def456.jsonl" }]));
+  check("Notification permission → hook.attention", deepEqual(hook("Notification", { message: "Claude needs your permission to use Bash",
+    title: "Permission needed", notification_type: "permission_prompt" }),
+    [{ kind: "hook.attention", message: "Claude needs your permission to use Bash" }]));
+  check("Notification elicitation → hook.attention", hook("Notification", { message: "?", notification_type: "elicitation_dialog" }).length === 1);
+  check("Notification idle_prompt → []", deepEqual(hook("Notification", { message: "Claude is waiting for your input",
+    notification_type: "idle_prompt" }), []));
+  check("Notification auth_success → []", deepEqual(hook("Notification", { message: "ok", notification_type: "auth_success" }), []));
+  check("Notification sans type : permission → attention", hook("Notification", { message: "Claude needs your permission" }).length === 1);
+  check("Notification sans type : inactivité → []", deepEqual(hook("Notification", { message: "Claude is waiting for your input" }), []));
+  check("Événement non branché → []", deepEqual(hook("PreToolUse", { tool_name: "Bash" }), []) && deepEqual(hook("SessionEnd"), []));
 });
 
 unit("titre de session (ai-title)", () => {

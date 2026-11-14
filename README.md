@@ -18,6 +18,8 @@ par l'app, ce qui permet de suivre un changement de format sans republier l'app.
   (où l'app l'exécute sans accès au disque, au réseau ni aux processus).
 - L'app refuse toute option de lancement qui touche aux permissions (`--dangerously-skip-permissions`,
   `--permission-mode`, `--allowedTools`…), quel que soit l'adaptateur.
+- Hooks : l'adaptateur ne fait que demander des noms d'événements (`manifest.hooks`) ; l'app les filtre, génère elle-même
+  le fichier de réglages (clé `hooks` seule) et n'y met jamais d'autre commande que son propre relais `pupitre-hook`.
 - `index.json` liste les adaptateurs publiés. Les paquets seront signés (ed25519) avant la première distribution.
 
 ## Tests

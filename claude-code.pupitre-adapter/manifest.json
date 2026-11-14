@@ -1,7 +1,7 @@
 {
   "id": "claude-code",
   "name": "Claude Code",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "adapterApi": 1,
   "cli": { "binary": "claude", "versionCommand": ["--version"], "testedVersions": ">=2.1.295 <2.2.0" },
   "launch": {
@@ -14,5 +14,10 @@
     "subagentsDir": "{sessionDir}/{sessionId}/subagents"
   },
   "input": { "exit": "/exit" },
+  "hooks": {
+    "format": "hooks-json-1",
+    "settingsFlag": "--settings",
+    "events": ["SessionStart", "UserPromptSubmit", "Stop", "SubagentStop", "Notification"]
+  },
   "capabilities": { "subagents": true, "resume": true, "hooks": true }
 }

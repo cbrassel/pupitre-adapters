@@ -4,7 +4,7 @@
     {
       "id": "claude-code",
       "name": "Claude Code",
-      "version": "1.1.0",
+      "version": "1.2.0",
       "adapterApi": 1,
       "path": "claude-code.pupitre-adapter",
       "testedVersions": ">=2.1.295 <2.2.0"
