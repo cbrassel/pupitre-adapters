@@ -210,6 +210,14 @@ function _sessionMeta(d) {
   });
 }
 
+// Titre généré par Claude Code : ligne {"type":"ai-title","aiTitle":"…","sessionId":"…"} (sans uuid ni timestamp),
+// répétée dans le fichier. Extension optionnelle session.meta.title.
+function _aiTitle(d) {
+  var t = _str(d.aiTitle);
+  if (t === null || t.trim() === "" || typeof d.sessionId !== "string") return null;
+  return _event(d, "session.meta", { sessionId: d.sessionId, title: _truncate(t.trim(), 200) });
+}
+
 function _decodeUser(d, ctx) {
   var msg = d.message;
   if (!_isObj(msg)) return [];
@@ -447,6 +455,11 @@ function _decodeObject(d, ctx) {
       var meta = _sessionMeta(d);
       if (meta) out.push(meta);
     }
+  }
+  if (type === "ai-title") {
+    if (role !== "main") return [];
+    var title = _aiTitle(d);
+    return title ? [title] : [];
   }
   var evs;
   if (type === "user") evs = _decodeUser(d, ctx);

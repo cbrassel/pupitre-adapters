@@ -235,6 +235,12 @@
     },
     {
       "kind": "session.meta",
+      "uuid": null,
+      "sessionId": "950ddaed-55d7-488f-9504-4d078e80c596",
+      "title": "Reprise de session"
+    },
+    {
+      "kind": "session.meta",
       "uuid": "a5cdf093-263f-4fa7-8090-a578d41864f9",
       "timestamp": "2026-11-13T15:17:05.072Z",
       "sessionId": "950ddaed-55d7-488f-9504-4d078e80c596",
@@ -315,6 +321,12 @@
       "agentId": "ac0648170a13f2404",
       "status": "done",
       "resultText": "**Verdict B3-T2 : CONFORME AVEC MINEURS** (un trou de test à combler, le code lui-même est juste)\n\nTests rejoués : `RouteServiceSlice|ServiceActivity|IdentifierMapping` au Mac, 46 tests verts. Arbre r …[tronqué]"
+    },
+    {
+      "kind": "session.meta",
+      "uuid": null,
+      "sessionId": "950ddaed-55d7-488f-9504-4d078e80c596",
+      "title": "Reprise de session"
     },
     {
       "kind": "session.meta",
@@ -457,6 +469,12 @@
       "agentId": "a8da916bc8123f001",
       "status": "done",
       "resultText": "**SHA : 3e66308** (branche tache/b3-t2, poussée sur origin ; parent cc9d53d)\n\n**Fichiers**\n- Packages/DomainKit/Sources/DomainKit/GTFS/ServiceIndex.swift\n- Packages/DomainKit/Tests/DomainKitTests/ …[tronqué]"
+    },
+    {
+      "kind": "session.meta",
+      "uuid": null,
+      "sessionId": "950ddaed-55d7-488f-9504-4d078e80c596",
+      "title": "Reprise de session"
     },
     {
       "kind": "session.meta",

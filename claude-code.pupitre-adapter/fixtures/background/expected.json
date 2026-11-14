@@ -26,6 +26,12 @@
     },
     {
       "kind": "session.meta",
+      "uuid": null,
+      "sessionId": "91493cde-6284-46d5-82c3-e9abc375e337",
+      "title": "Reprise de la session"
+    },
+    {
+      "kind": "session.meta",
       "uuid": "3c2933ad-58da-46a2-b4c1-75566769d1d9",
       "timestamp": "2026-11-14T14:43:10.181Z",
       "sessionId": "91493cde-6284-46d5-82c3-e9abc375e337",
@@ -278,6 +284,12 @@
     },
     {
       "kind": "session.meta",
+      "uuid": null,
+      "sessionId": "91493cde-6284-46d5-82c3-e9abc375e337",
+      "title": "Reprise de la session"
+    },
+    {
+      "kind": "session.meta",
       "uuid": "185e9aab-db4c-4e01-9a08-e6bfeef62af5",
       "timestamp": "2026-11-14T14:51:49.627Z",
       "sessionId": "91493cde-6284-46d5-82c3-e9abc375e337",
@@ -301,6 +313,12 @@
       "agentId": "ace4c02ab548a35e0",
       "status": "done",
       "resultText": "## Rapport : amendement du plan B3, Task 5 (cache Valkey des tranches)\n\n**SHA poussé** : `7cdc080e0d9403f5bed6208a4eda6c13a20d60ef` sur `tache/b3-plan5` (distant égal au local, parti de `1392512`).\n** …[tronqué]"
+    },
+    {
+      "kind": "session.meta",
+      "uuid": null,
+      "sessionId": "91493cde-6284-46d5-82c3-e9abc375e337",
+      "title": "Reprise de la session"
     },
     {
       "kind": "session.meta",

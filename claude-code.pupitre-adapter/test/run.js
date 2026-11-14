@@ -378,7 +378,7 @@ unit("entrées invalides", () => {
   check("non-chaîne → []", deepEqual(call("decodeLine", null, MAIN), []) && deepEqual(call("decodeLine", 42, MAIN), []));
   check("tableau JSON → []", deepEqual(call("decodeLine", "[1,2]", MAIN), []));
   check("type inconnu → []", deepEqual(call("decodeLine", JSON.stringify({ ...base, type: "nouveau-type", foo: 1 }), MAIN), []));
-  for (const t of ["queue-operation", "last-prompt", "mode", "permission-mode", "ai-title", "file-history-snapshot", "cost-state"]) {
+  for (const t of ["queue-operation", "last-prompt", "mode", "permission-mode", "file-history-snapshot", "cost-state"]) {
     check(`type ${t} → []`, deepEqual(call("decodeLine", JSON.stringify({ type: t, sessionId: "s-1" }), MAIN), []));
   }
   check("user sans message → session.meta seul", deepEqual(kinds(decode(JSON.stringify({ ...base, type: "user" }))), ["session.meta"]));
@@ -389,6 +389,19 @@ unit("entrées invalides", () => {
   check("decodeFile lignes mêlées", deepEqual(kinds(withoutMeta(call("decodeFile", "garbage\n" + userLine("a") + "\n\n{]\n", MAIN))), ["user.prompt"]));
   check("decodeAgentMeta invalide → null", call("decodeAgentMeta", "{") === null && call("decodeAgentMeta", "[]") === null);
   check("mapHookEvent → []", deepEqual(call("mapHookEvent", { hook_event_name: "Stop" }), []));
+});
+
+unit("titre de session (ai-title)", () => {
+  const line = JSON.stringify({ type: "ai-title", aiTitle: "Localisation de l'application", sessionId: "s-1" });
+  const evs = decode(line);
+  check("ai-title → session.meta avec title", deepEqual(evs, [{ kind: "session.meta", uuid: null, sessionId: "s-1",
+    title: "Localisation de l'application" }]), JSON.stringify(evs));
+  check("ai-title dans un transcript d'agent : rien", deepEqual(decode(line, { role: "agent", agentId: "a1" }), []));
+  check("ai-title vide : rien", deepEqual(decode(JSON.stringify({ type: "ai-title", aiTitle: "  ", sessionId: "s-1" })), []));
+  check("ai-title sans sessionId : rien", deepEqual(decode(JSON.stringify({ type: "ai-title", aiTitle: "x" })), []));
+  check("ai-title non chaîne : rien", deepEqual(decode(JSON.stringify({ type: "ai-title", aiTitle: 3, sessionId: "s-1" })), []));
+  const long = decode(JSON.stringify({ type: "ai-title", aiTitle: "t".repeat(500), sessionId: "s-1" }));
+  check("ai-title tronqué à 200", long.length === 1 && long[0].title.length === 200, JSON.stringify(long));
 });
 
 unit("decodeAgentMeta", () => {

@@ -51,6 +51,12 @@
     },
     {
       "kind": "session.meta",
+      "uuid": null,
+      "sessionId": "543d0a44-a7fc-49a8-99ac-31f1c76b5edb",
+      "title": "Localisation de l'application en anglais"
+    },
+    {
+      "kind": "session.meta",
       "uuid": "eaa8d3a6-c1b3-4002-b0a6-a4c94148eedb",
       "timestamp": "2026-10-31T20:49:10.897Z",
       "sessionId": "543d0a44-a7fc-49a8-99ac-31f1c76b5edb",
@@ -165,6 +171,12 @@
     },
     {
       "kind": "session.meta",
+      "uuid": null,
+      "sessionId": "543d0a44-a7fc-49a8-99ac-31f1c76b5edb",
+      "title": "Localisation de l'application en anglais"
+    },
+    {
+      "kind": "session.meta",
       "uuid": "45f565da-047e-46eb-bc0c-601b330780db",
       "timestamp": "2026-10-31T20:49:43.221Z",
       "sessionId": "543d0a44-a7fc-49a8-99ac-31f1c76b5edb",
@@ -262,6 +274,12 @@
       "toolUseId": "toolu_01BPyw1caHUT3b2V5JiZURpg",
       "isError": false,
       "text": ".build/\n.swiftpm/\nDerivedData/\nxcuserdata/\n*.xcuserstate\n.DS_Store\n*.xcodeproj/project.xcworkspace/\nApp-export/\nApp-export\nignored\ngithub.com\n  ✓ Logged in to github.com account user (keyring)\n  - Act …[tronqué]"
+    },
+    {
+      "kind": "session.meta",
+      "uuid": null,
+      "sessionId": "543d0a44-a7fc-49a8-99ac-31f1c76b5edb",
+      "title": "Localisation de l'application en anglais"
     },
     {
       "kind": "session.meta",
@@ -732,6 +750,12 @@
       "toolUseId": "toolu_01BenVPmteGQBErXMQF7enUV",
       "isError": false,
       "text": "The file /Users/user/Projet/Project/Scripts/release.sh has been updated successfully. (file state is current in your context — no need to Read it back)"
+    },
+    {
+      "kind": "session.meta",
+      "uuid": null,
+      "sessionId": "543d0a44-a7fc-49a8-99ac-31f1c76b5edb",
+      "title": "Localisation de l'application en anglais"
     },
     {
       "kind": "session.meta",
