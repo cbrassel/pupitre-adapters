@@ -372,6 +372,41 @@ unit("prompt mis en file pendant un tour", () => {
     evs[0].text === "pardon, le fichier b" && evs[0].queued === true && evs[0].imageCount === 0, JSON.stringify(evs));
 });
 
+unit("questions à choix (AskUserQuestion)", () => {
+  const ask = JSON.stringify({ ...base, type: "assistant", message: { model: "claude-opus-5-5", id: "msg_q", type: "message",
+    role: "assistant", content: [{ type: "tool_use", id: "tq", name: "AskUserQuestion", input: { questions: [
+      { question: "Quelle couleur ?", header: "Couleur", multiSelect: false,
+        options: [{ label: "Bleu (Recommandé)", description: "La plus lisible." }, { label: "Rouge", description: "" }] },
+      { question: "Quels fichiers ?", header: "Fichiers", multiSelect: true, options: [{ label: "A" }, { label: "B" }] },
+      { question: "", options: [] },
+    ] } }] } });
+  const evs = withoutMeta(decode(ask)).filter((e) => e.kind !== "assistant.usage");
+  check("question.ask après tool.call", deepEqual(kinds(evs), ["tool.call", "question.ask"]), JSON.stringify(evs));
+  const q = evs[1];
+  check("question.ask : champs", q.toolUseId === "tq" && q.messageId === "msg_q" && q.questions.length === 2 &&
+    q.questions[0].header === "Couleur" && q.questions[0].options[0].description === "La plus lisible." &&
+    q.questions[0].options[1].description === undefined && q.questions[1].multiSelect === true, JSON.stringify(q));
+
+  const answered = withoutMeta(decode(userLine(
+    [{ tool_use_id: "tq", type: "tool_result", content: 'User has answered your questions: "Quelle couleur ?"="Bleu (Recommandé)". You can now continue.' }],
+    { toolUseResult: { questions: [], answers: { "Quelle couleur ?": "Bleu (Recommandé)", "Quels fichiers ?": "A, B" },
+                       annotations: { "Quelle couleur ?": { notes: "plutôt foncé" } } } })));
+  check("question.answer (toolUseResult)", deepEqual(kinds(answered), ["tool.result", "question.answer"]) &&
+    deepEqual(answered[1].answers, [{ question: "Quelle couleur ?", answer: "Bleu (Recommandé)", note: "plutôt foncé" },
+                                     { question: "Quels fichiers ?", answer: "A, B" }]), JSON.stringify(answered));
+
+  const fromText = withoutMeta(decode(userLine([{ tool_use_id: "tq", type: "tool_result",
+    content: 'Your questions have been answered: "Quelle \\"couleur\\" ?"="Rouge", "Quels fichiers ?"="A". You can now continue.' }])));
+  check("question.answer (texte)", fromText.length === 2 && deepEqual(fromText[1].answers,
+    [{ question: 'Quelle "couleur" ?', answer: "Rouge" }, { question: "Quels fichiers ?", answer: "A" }]), JSON.stringify(fromText));
+
+  const declined = withoutMeta(decode(userLine([{ tool_use_id: "tq", type: "tool_result", is_error: true,
+    content: "The user doesn't want to proceed with this tool use." }], { toolUseResult: "Error: The user doesn't want to proceed" })));
+  check("question refusée : pas de question.answer", deepEqual(kinds(declined), ["tool.result"]), JSON.stringify(declined));
+  const plain = withoutMeta(decode(userLine([{ tool_use_id: "t9", type: "tool_result", content: '"a"="b"' }])));
+  check("résultat ordinaire : pas de question.answer", deepEqual(kinds(plain), ["tool.result"]), JSON.stringify(plain));
+});
+
 unit("entrées invalides", () => {
   check("JSON invalide → []", deepEqual(call("decodeLine", "{pas du json", MAIN), []));
   check("ligne vide → []", deepEqual(call("decodeLine", "", MAIN), []));

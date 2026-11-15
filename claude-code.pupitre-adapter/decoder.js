@@ -274,6 +274,8 @@ function _decodeUser(d, ctx) {
       if (tur.isAsync === true || tur.status === "async_launched") fields.async = true;
     }
     out.push(_event(d, "tool.result", fields));
+    var answers = resultBlocks.length === 1 ? _questionAnswers(tur, rb) : null;
+    if (answers) out.push(_event(d, "question.answer", { toolUseId: fields.toolUseId, answers: answers }));
   }
 
   if (typeof text === "string" && text.trim() !== "" || (!hasToolResult && images > 0)) {
@@ -285,6 +287,58 @@ function _decodeUser(d, ctx) {
     }
   }
   return out;
+}
+
+// Questions à choix (outil AskUserQuestion) : questions, options, et réponses de l'utilisateur.
+var MAX_QUESTIONS = 8, MAX_OPTIONS = 8;
+
+function _questionItems(input) {
+  var list = Array.isArray(input.questions) ? input.questions : [];
+  var out = [];
+  for (var i = 0; i < list.length && out.length < MAX_QUESTIONS; i++) {
+    var q = list[i];
+    if (!_isObj(q) || typeof q.question !== "string" || q.question.trim() === "") continue;
+    var opts = [];
+    var raw = Array.isArray(q.options) ? q.options : [];
+    for (var j = 0; j < raw.length && opts.length < MAX_OPTIONS; j++) {
+      var o = raw[j];
+      if (!_isObj(o) || typeof o.label !== "string" || o.label.trim() === "") continue;
+      opts.push({ label: _truncate(o.label, 200),
+                  description: typeof o.description === "string" && o.description.trim() !== "" ? _truncate(o.description, 600) : undefined });
+    }
+    out.push({ question: _truncate(q.question, 2000),
+               header: typeof q.header === "string" && q.header.trim() !== "" ? _truncate(q.header, 60) : undefined,
+               multiSelect: q.multiSelect === true, options: opts });
+  }
+  return out;
+}
+
+// Réponses : toolUseResult.answers ({question: réponse}, choix multiples joints par « , »), sinon le texte du
+// résultat (« …answered your questions: "q"="r", "q2"="r2". … »). null si ce n'est pas une réponse à des questions.
+function _unescape(s) { return s.replace(/\\(.)/g, "$1"); }
+
+function _questionAnswers(tur, block) {
+  var out = [];
+  if (tur && _isObj(tur.answers)) {
+    var notes = _isObj(tur.annotations) ? tur.annotations : {};
+    for (var q in tur.answers) {
+      if (!Object.prototype.hasOwnProperty.call(tur.answers, q) || typeof tur.answers[q] !== "string") continue;
+      var a = { question: _truncate(q, 2000), answer: _truncate(tur.answers[q], 2000) };
+      var n = notes[q];
+      if (_isObj(n) && typeof n.notes === "string" && n.notes.trim() !== "") a.note = _truncate(n.notes, 2000);
+      out.push(a);
+      if (out.length >= MAX_QUESTIONS) break;
+    }
+    return out.length > 0 ? out : null;
+  }
+  if (block.is_error === true) return null;
+  var text = _contentText(block.content) || "";
+  if (!/^\s*(User has answered your questions|Your questions have been answered|The user answered)/.test(text)) return null;
+  var re = /"((?:[^"\\]|\\.)*)"="((?:[^"\\]|\\.)*)"/g, m;
+  while ((m = re.exec(text)) !== null && out.length < MAX_QUESTIONS) {
+    out.push({ question: _truncate(_unescape(m[1]), 2000), answer: _truncate(_unescape(m[2]), 2000) });
+  }
+  return out.length > 0 ? out : null;
 }
 
 function _toolTarget(name, input) {
@@ -380,6 +434,10 @@ function _decodeAssistant(d, ctx) {
             target: _toolTarget(name, input),
             fileChange: _fileChange(name, input)
           }));
+          if (name === "AskUserQuestion") {
+            var qs = _questionItems(input);
+            if (qs.length > 0) out.push(_event(d, "question.ask", { messageId: messageId, toolUseId: _str(b.id), questions: qs }));
+          }
         }
       }
     }
