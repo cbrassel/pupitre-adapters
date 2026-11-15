@@ -571,44 +571,113 @@ function mapHookEvent(json) {
     var d = json;
     if (typeof d === "string") d = JSON.parse(d);
     if (!_isObj(d)) return [];
-    var name = _str(d.hook_event_name);
-    switch (name) {
-      case "SessionStart": {
-        var sid = _str(d.session_id);
-        if (!sid) return [];
-        var ev = { kind: "hook.session", sessionId: sid };
-        if (_str(d.transcript_path)) ev.transcriptPath = d.transcript_path;
-        if (_str(d.source)) ev.source = d.source;
-        return [ev];
-      }
-      case "UserPromptSubmit":
-        return [{ kind: "hook.busy" }];
-      case "Stop": {
-        var idle = { kind: "hook.idle" };
-        var msg = _hookText(d.last_assistant_message);
-        if (msg) idle.message = msg;
-        return [idle];
-      }
-      case "SubagentStop": {
-        var stop = { kind: "hook.agentStop" };
-        if (_str(d.agent_id)) stop.agentId = d.agent_id;
-        if (_str(d.agent_transcript_path)) stop.transcriptPath = d.agent_transcript_path;
-        return [stop];
-      }
-      case "Notification": {
-        var type = _str(d.notification_type);
-        var text = _hookText(d.message);
-        // Sans type (anciennes versions) : tout sauf le rappel d'inactivité.
-        var attention = type ? ATTENTION_NOTIFICATIONS[type] === true
-                             : !(text && /waiting for your input/i.test(text));
-        if (!attention) return [];
-        var att = { kind: "hook.attention" };
-        if (text) att.message = text;
-        return [att];
-      }
-      default:
-        return [];
+    var out = _mapHook(d);
+    // Effort actif du tour, transmis par tous les hooks du thread principal (Claude Code ≥ 2.1.3xx).
+    var effort = _effortLevel(d.effort);
+    if (effort && !_str(d.agent_id)) out.push({ kind: "hook.status", effort: effort });
+    return out;
+  } catch (e) {
+    return [];
+  }
+}
+
+function _effortLevel(v) {
+  var level = _isObj(v) ? _str(v.level) : null;
+  return level && /^[a-z]{1,16}$/.test(level) ? level : null;
+}
+
+function _num(v) { return typeof v === "number" && isFinite(v) ? v : null; }
+
+function _mapHook(d) {
+  var name = _str(d.hook_event_name);
+  switch (name) {
+    case "SessionStart": {
+      var sid = _str(d.session_id);
+      if (!sid) return [];
+      var ev = { kind: "hook.session", sessionId: sid };
+      if (_str(d.transcript_path)) ev.transcriptPath = d.transcript_path;
+      if (_str(d.source)) ev.source = d.source;
+      return [ev];
     }
+    case "UserPromptSubmit":
+      return [{ kind: "hook.busy" }];
+    case "Stop": {
+      var idle = { kind: "hook.idle" };
+      var msg = _hookText(d.last_assistant_message);
+      if (msg) idle.message = msg;
+      return [idle];
+    }
+    case "SubagentStop": {
+      var stop = { kind: "hook.agentStop" };
+      if (_str(d.agent_id)) stop.agentId = d.agent_id;
+      if (_str(d.agent_transcript_path)) stop.transcriptPath = d.agent_transcript_path;
+      return [stop];
+    }
+    case "Notification": {
+      var type = _str(d.notification_type);
+      var text = _hookText(d.message);
+      // Sans type (anciennes versions) : tout sauf le rappel d'inactivité.
+      var attention = type ? ATTENTION_NOTIFICATIONS[type] === true
+                           : !(text && /waiting for your input/i.test(text));
+      if (!attention) return [];
+      var att = { kind: "hook.attention" };
+      if (text) att.message = text;
+      return [att];
+    }
+    default:
+      return [];
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Ligne d'état (statusLine) : JSON reçu par la commande de ligne d'état → hook.status.
+// Schéma de Claude Code 2.1.325 (texte d'aide de /statusline) : model.{id,display_name}, effort.level,
+// context_window.{total_input_tokens,context_window_size,current_usage,used_percentage},
+// rate_limits.{five_hour,seven_day,spend_limit}.{used_percentage,resets_at (secondes Unix)}.
+
+var RATE_LIMIT_LABELS = { five_hour: "5 h", seven_day: "7 jours", spend_limit: "Dépenses" };
+
+function mapStatusLine(json) {
+  try {
+    var d = json;
+    if (typeof d === "string") d = JSON.parse(d);
+    if (!_isObj(d)) return [];
+    var ev = { kind: "hook.status" };
+    if (_isObj(d.model)) {
+      if (_str(d.model.id)) ev.model = _truncate(d.model.id, 120);
+      if (_str(d.model.display_name)) ev.modelName = _truncate(d.model.display_name, 120);
+    }
+    var effort = _effortLevel(d.effort);
+    if (effort) ev.effort = effort;
+    var cw = d.context_window;
+    if (_isObj(cw)) {
+      var size = _num(cw.context_window_size);
+      if (size && size > 0) ev.contextWindow = Math.round(size);
+      var tokens = null;
+      var u = cw.current_usage;
+      if (_isObj(u)) {
+        tokens = (_num(u.input_tokens) || 0) + (_num(u.cache_creation_input_tokens) || 0) + (_num(u.cache_read_input_tokens) || 0);
+      } else if (_num(cw.total_input_tokens) !== null) {
+        tokens = cw.total_input_tokens;
+      }
+      if (tokens !== null && tokens > 0) ev.contextTokens = Math.round(tokens);
+    }
+    var rl = d.rate_limits;
+    if (_isObj(rl)) {
+      var limits = [];
+      for (var key in rl) {
+        if (!Object.prototype.hasOwnProperty.call(rl, key) || !/^[a-z0-9_]{1,40}$/.test(key)) continue;
+        var w = rl[key];
+        if (!_isObj(w) || _num(w.used_percentage) === null) continue;
+        var limit = { id: key, label: RATE_LIMIT_LABELS[key] || key.replace(/_/g, " "),
+                      percent: Math.max(0, w.used_percentage) };
+        if (_num(w.resets_at) !== null) limit.resetsAt = w.resets_at;
+        limits.push(limit);
+      }
+      ev.limits = limits;
+    }
+    for (var k in ev) if (k !== "kind") return [ev];
+    return [];
   } catch (e) {
     return [];
   }
@@ -617,5 +686,5 @@ function mapHookEvent(json) {
 // Export Node, gardé pour que JavaScriptCore évalue le fichier sans erreur.
 if (typeof module !== "undefined" && module && module.exports) {
   module.exports = { decodeLine: decodeLine, decodeFile: decodeFile, decodeAgentMeta: decodeAgentMeta,
-                     discover: discover, mapHookEvent: mapHookEvent };
+                     discover: discover, mapHookEvent: mapHookEvent, mapStatusLine: mapStatusLine };
 }

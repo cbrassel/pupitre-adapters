@@ -23,7 +23,7 @@ const UPDATE = process.argv.includes("--update");
 const sandbox = {};
 vm.createContext(sandbox);
 vm.runInContext(fs.readFileSync(path.join(ADAPTER, "decoder.js"), "utf8"), sandbox, { filename: "decoder.js" });
-for (const fn of ["decodeLine", "decodeFile", "decodeAgentMeta", "discover", "mapHookEvent"]) {
+for (const fn of ["decodeLine", "decodeFile", "decodeAgentMeta", "discover", "mapHookEvent", "mapStatusLine"]) {
   if (typeof sandbox[fn] !== "function") {
     console.error(`decoder.js ne définit pas la fonction globale ${fn}`);
     process.exit(1);
@@ -424,6 +424,54 @@ unit("mapHookEvent", () => {
   check("Notification sans type : permission → attention", hook("Notification", { message: "Claude needs your permission" }).length === 1);
   check("Notification sans type : inactivité → []", deepEqual(hook("Notification", { message: "Claude is waiting for your input" }), []));
   check("Événement non branché → []", deepEqual(hook("PreToolUse", { tool_name: "Bash" }), []) && deepEqual(hook("SessionEnd"), []));
+});
+
+unit("effort dans les hooks", () => {
+  const common = { session_id: "11111111-2222-4333-8444-555555555555", cwd: "/Users/user/Projet/project", transcript_path: "/t.jsonl" };
+  check("UserPromptSubmit + effort → hook.busy + hook.status", deepEqual(call("mapHookEvent",
+    { ...common, hook_event_name: "UserPromptSubmit", prompt: "x", effort: { level: "high" } }),
+    [{ kind: "hook.busy" }, { kind: "hook.status", effort: "high" }]));
+  check("Hook non branché + effort → hook.status seul", deepEqual(call("mapHookEvent",
+    { ...common, hook_event_name: "PreToolUse", effort: { level: "xhigh" } }), [{ kind: "hook.status", effort: "xhigh" }]));
+  check("Hook d'un sous-agent : effort ignoré", deepEqual(call("mapHookEvent",
+    { ...common, hook_event_name: "PreToolUse", agent_id: "a1", effort: { level: "low" } }), []));
+  check("Effort invalide ignoré", deepEqual(call("mapHookEvent",
+    { ...common, hook_event_name: "Stop", effort: { level: "<script>" } }), [{ kind: "hook.idle" }]) &&
+    deepEqual(call("mapHookEvent", { ...common, hook_event_name: "Stop", effort: "high" }), [{ kind: "hook.idle" }]));
+});
+
+unit("mapStatusLine", () => {
+  // Forme du texte d'aide de /statusline (Claude Code 2.1.325), valeurs fictives.
+  const full = {
+    session_id: "s", transcript_path: "/t.jsonl", cwd: "/Users/user/p",
+    model: { id: "claude-opus-5-5", display_name: "Opus 5.5 (1M context)" },
+    effort: { level: "high" },
+    context_window: { total_input_tokens: 480500, total_output_tokens: 200, context_window_size: 1000000,
+      current_usage: { input_tokens: 500, output_tokens: 200, cache_creation_input_tokens: 2000, cache_read_input_tokens: 478000 },
+      used_percentage: 48, remaining_percentage: 52 },
+    rate_limits: { five_hour: { used_percentage: 37.5, resets_at: 1763200000 },
+                   seven_day: { used_percentage: 12, resets_at: 1763600000 } },
+  };
+  check("Ligne d'état complète → hook.status", deepEqual(call("mapStatusLine", full), [{ kind: "hook.status",
+    model: "claude-opus-5-5", modelName: "Opus 5.5 (1M context)", effort: "high", contextWindow: 1000000, contextTokens: 480500,
+    limits: [{ id: "five_hour", label: "5 h", percent: 37.5, resetsAt: 1763200000 },
+             { id: "seven_day", label: "7 jours", percent: 12, resetsAt: 1763600000 }] }]),
+    JSON.stringify(call("mapStatusLine", full)));
+  check("Reçue en texte JSON", call("mapStatusLine", JSON.stringify(full)).length === 1);
+  const early = call("mapStatusLine", { model: { id: "m", display_name: "M" },
+    context_window: { total_input_tokens: 0, context_window_size: 200000, current_usage: null, used_percentage: null } });
+  check("Avant la première réponse : pas de tokens, pas de limites", deepEqual(early,
+    [{ kind: "hook.status", model: "m", modelName: "M", contextWindow: 200000 }]), JSON.stringify(early));
+  const noUsage = call("mapStatusLine", { context_window: { total_input_tokens: 1234, context_window_size: 200000 } });
+  check("Sans current_usage : total_input_tokens", noUsage[0].contextTokens === 1234, JSON.stringify(noUsage));
+  const spend = call("mapStatusLine", { rate_limits: { spend_limit: { used_percentage: 120, resets_at: 1, used_usd: 3 },
+    weird: "x", "bad key": { used_percentage: 1 } } });
+  check("Limite de dépenses, clés invalides ignorées", deepEqual(spend, [{ kind: "hook.status",
+    limits: [{ id: "spend_limit", label: "Dépenses", percent: 120, resetsAt: 1 }] }]), JSON.stringify(spend));
+  check("Limites vides → liste vide (fenêtres expirées)", deepEqual(call("mapStatusLine", { rate_limits: {} }),
+    [{ kind: "hook.status", limits: [] }]));
+  check("Rien d'utile → []", deepEqual(call("mapStatusLine", { session_id: "s" }), []) &&
+    deepEqual(call("mapStatusLine", null), []) && deepEqual(call("mapStatusLine", "{"), []) && deepEqual(call("mapStatusLine", [1]), []));
 });
 
 unit("titre de session (ai-title)", () => {
